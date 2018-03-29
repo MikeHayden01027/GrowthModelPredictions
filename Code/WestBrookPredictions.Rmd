@@ -1,0 +1,205 @@
+---
+title: "Explor Data Possibilities"
+author: "Michael Hayden"
+date: "12/22/2017"
+output: html_document
+---
+
+```{r}
+suppressPackageStartupMessages(library(dplyr))
+suppressPackageStartupMessages(library(highcharter))
+suppressPackageStartupMessages(library(ggplot2))
+suppressPackageStartupMessages(library(ggvis))
+suppressPackageStartupMessages(library(magrittr))
+suppressPackageStartupMessages(library(purrr))
+suppressPackageStartupMessages(library(tidyr))
+```
+
+
+
+```{r setup, include=FALSE}
+setwd("/Users/michaeljames/Documents/MastersProject/West Brook Visulizations/Data")
+load("pForMike.RData")
+write.csv(p , file = "westBrookPredictions.csv")
+```
+
+
+```{r}
+plotPred <- function(d, varsToPlot, isYOYGG, speciesGG ) {
+     #  all = c('len','temp','flow','count')
+     all = c('temp','flow','count')
+     
+     # if(length(varsToPlot) == 1) {
+     notPlot <- NA
+     notPlot[1] <- all[!(all %in% varsToPlot)][1]
+     notPlot[2] <- all[!(all %in% varsToPlot)][2]
+     #   notPlot[3] <- all[!(all %in% varsToPlot)][3]
+     
+     #   pGG <- p %>% filter(isYOY == isYOYGG, species == speciesGG, eval(as.name(notPlot[1])) == 0, eval(as.name(notPlot[2])) == 0, eval(as.name(notPlot[3])) == 0 ) %>%
+     #                 distinct(eval(as.name(varsToPlot[1])), iter, isYOY, river, species, season, .keep_all = TRUE)
+     d %>% filter(isYOY == isYOYGG, eval(as.name(notPlot[1])) == 0, eval(as.name(notPlot[2])) == 0 ) %>%
+         distinct(eval(as.name(varsToPlot[1])), iter, isYOY, river, season, .keep_all = TRUE) }
+         #group_by_(EEvent , 'river' , 'season' ) %>% 
+         #summarise(meanPredGr = mean(predGr))  }
+
+
+var2 <- plotPred(p , 'temp' , '0' , 'bkt' ) %>% 
+         
+        group_by(temp , river , season) %>% 
+        summarise(predGr = mean(predGr)) %>% 
+        ungroup() %>%
+        mutate(temP = as.numeric(temp), 
+               predGR = as.numeric(predGr))
+
+
+var <- plotPred(p , 'temp' , '0' , 'bkt' ) %>%  left_join(var2 , by = c('river' = 'river' , 'temp' = 'temp' , 'season' = 'season'))
+
+var %>% ggvis( y = ~predGR , x = ~temp ) %>%
+        group_by(iter , river , season) %>%
+        layer_lines(stroke = ~river , opacity := 0.3) 
+         #layer_lines( y =~predGR , x =~temP , stroke =~river , strokeWidth := 2)
+                                                           
+                                                #  var2   %>% ggvis( y = ~predGr , x = ~temp )   %>% layer_lines() %>% data()
+
+```
+
+```{r}
+
+maximum <- function(data){ 
+                    c <- max( data$predGr )
+                    c }
+
+meean <- function(data){ 
+                    c <- mean( data$predGr )
+                    c }
+
+minimum <- function(data){ 
+                    c <- min( data$predGr )
+                    c }
+
+ 
+
+ma <- p %>% select(river , season , temp , isYOY , predGr) %>% 
+            filter(isYOY == 0 ) %>% 
+            mutate(groupVar= as.factor(temp)) %>%
+            group_by(groupVar)  %>% 
+            nest() %>%
+            mutate(predGrVal = map(data , maximum)) %>%
+            unnest(predGrVal) %>% 
+            select(groupVar , predGrVal) %>%
+            mutate(value = "predGrMax")
+
+me <- p %>% select(river , season ,temp , isYOY , predGr) %>% 
+           filter(isYOY == 0  ) %>% 
+           mutate(groupVar = as.factor(temp)) %>%
+           group_by(groupVar)  %>% 
+           nest() %>%
+           mutate(predGrVal = map(data , meean)) %>%
+           unnest(predGrVal)%>% 
+            select(groupVar , predGrVal) %>%
+            mutate(value = "predGrMean")
+           
+
+mi <- p %>% select(river , season ,temp , isYOY , predGr) %>% 
+           filter(isYOY == 0  ) %>% 
+           mutate(groupVar = as.factor(temp)) %>%
+           group_by(groupVar)  %>% 
+           nest() %>%
+           mutate(predGrVal = map(data , minimum)) %>%
+           unnest(predGrVal)%>% 
+            select(groupVar , predGrVal) %>%
+            mutate(value = "predGrMin")
+
+  
+
+ nes <- bind_rows(mi , me , ma) %>% spread(value , predGrVal)
+
+
+                
+```
+
+
+
+```{r}
+ppLot <- plotPred(p , 'temp' , '0' , 'bkt'  ) %>% filter(river == 'west brook' )
+
+ee <- ppLot %>% group_by(season , temp) %>% summarise(meanPr = mean(predGr) ,
+                                         maxPr = max(predGr) ,
+                                         minPr = min(predGr)) %>% ungroup()
+
+
+ee %>% group_by(season) %>% ggplot(aes(x = temp , y = meanPr)) + geom_line(aes(group = season , colour = season ) ,  size = .5) + 
+        geom_ribbon(aes(x = temp , y = meanPr , ymax = maxPr , ymin = minPr , group = season , fill = season), alpha = 0.5)
+
+ee %>% group_by(season) %>% plot_ly(y = ~maxPr , x = ~temp , type = 'scatter' , mode = 'lines' ,
+                                     line = list(color = 'transparent'),
+                                     showlegend = FALSE, name = 'High 2014') %>%
+                                    add_trace(y = ~minPr, type = 'scatter', mode = 'lines',
+            fill = 'tonexty', fillcolor='rgba(0,100,80,0.2)', line = list(color = 'transparent'),
+            showlegend = FALSE, name = 'Low 2014') %>%
+  add_trace(x = ~temp, y = ~ meanPr, type = 'scatter', mode = 'lines',
+            line = list(color='rgb(0,100,80)'),
+            name = 'Average') 
+
+````
+
+```{r}
+ee %>% group_by(season) %>% ggvis(x=~temp , y =~meanPr) %>% layer_points(fill =~season) %>%
+                                 layer_lines(stroke =~ season) %>%
+                                 layer_lines(x=~temp , y =~maxPr , strokeDash := 6 )
+```
+
+```{r}
+plotPred <- function(p, varsToPlot, isYOYGG, speciesGG) {
+#  all = c('len','temp','flow','count')
+  all = c('temp','flow','count')
+
+  if(length(varsToPlot) == 1) {
+    notPlot <- NA
+    notPlot[1] <- all[!(all %in% varsToPlot)][1]
+    notPlot[2] <- all[!(all %in% varsToPlot)][2]
+ #   notPlot[3] <- all[!(all %in% varsToPlot)][3]
+
+ #   pGG <- p %>% filter(isYOY == isYOYGG, species == speciesGG, eval(as.name(notPlot[1])) == 0, eval(as.name(notPlot[2])) == 0, eval(as.name(notPlot[3])) == 0 ) %>%
+#                 distinct(eval(as.name(varsToPlot[1])), iter, isYOY, river, species, season, .keep_all = TRUE)
+    pGG <- p %>% filter(isYOY == isYOYGG, eval(as.name(notPlot[1])) == 0, eval(as.name(notPlot[2])) == 0 ) %>%
+      distinct(eval(as.name(varsToPlot[1])), iter, isYOY, river, season, .keep_all = TRUE)
+   
+   
+  }
+
+  if(length(varsToPlot) == 2) {
+    notPlot <- NA
+    notPlot[1] <- all[!(all %in% varsToPlot)][1]
+  #  notPlot[2] <- all[!(all %in% varsToPlot)][2]
+
+#    pGG <- p %>% filter(isYOY == isYOYGG, species == speciesGG, eval(as.name(notPlot[1])) == 0, eval(as.name(notPlot[2])) == 0 ) %>%
+#      distinct(eval(as.name(varsToPlot[1])), eval(as.name(varsToPlot[2])), iter, isYOY, river, species, season, .keep_all = TRUE)
+
+    pGG <- p %>% filter(isYOY == isYOYGG, eval(as.name(notPlot[1])) == 0 ) %>%
+      distinct(eval(as.name(varsToPlot[1])), eval(as.name(varsToPlot[2])), iter, isYOY, river, season, .keep_all = TRUE)
+
+    pGG$iterGroup <- paste0(pGG$iter,pGG[[varsToPlot[2]]])
+
+   
+  }
+  return(pGG)
+}
+
+c <- plotPred(p , 'temp' , '0' , 'bkt')
+```
+
+
+```{r}
+d <-  p %>% select(count , flow , temp , iter , isYOY , season , river , predGr) 
+            filter( count == 0.00  , isYOY == 0  , season == 1)
+
+d %>% ggvis(x =~temp , y =~predGr) %>% 
+       group_by( iter ) %>%
+       layer_lines( stroke =~ iter) 
+       #layer_lines(data = p , x =~temp , y =~predGr)
+p %>% select(count , flow , temp , iter , isYOY , season , river , predGr)%>%
+      filter( isYOY == 0 , season == 1 , count == 1.5  , river == "west brook") %>% 
+      ggplot(aes(y = predGr , x = flow  )) + 
+        geom_line(aes(group=interaction(iter , temp) , color = temp  )) 
+```

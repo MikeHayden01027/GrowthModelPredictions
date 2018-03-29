@@ -1,0 +1,233 @@
+---
+title: "West BrookData"
+author: "Michael Hayden"
+date: "1/23/2018"
+output: html_document
+---
+
+### Load Packages
+```{r , warning=FALSE , message=FALSE}
+library(ggplot2)
+library(ggvis)
+library(highcharter)
+library(rlang)
+library(here)
+library(shiny)
+library(tidyr)
+library(dplyr)
+```
+
+### Functions
+```{r, warning=FALSE , message=FALSE}
+
+theme_Publication <- function(base_size=14, base_family="Times") {
+      library(grid)
+      library(ggthemes)
+      (theme_foundation(base_size=base_size, base_family=base_family)
+       + theme(plot.title = element_text(face = "bold",
+                                         size = rel(1.2), hjust = 0.5),
+               text = element_text(),
+               panel.background = element_rect(colour = NA),
+               plot.background = element_rect(colour = NA),
+               panel.border = element_rect(colour = NA),
+               axis.title = element_text(face = "bold",size = rel(1)),
+               axis.title.y = element_text(angle=90,vjust =2),
+               axis.title.x = element_text(vjust = -0.2),
+               axis.text = element_text(), 
+               axis.line = element_line(colour="black"),
+               axis.ticks = element_line(),
+               panel.grid.major = element_line(colour="#f0f0f0"),
+               panel.grid.minor = element_blank(),
+               legend.key = element_rect(colour = NA),
+               legend.position = "right",
+               legend.direction = "vertical",
+               legend.key.size= unit(0.6, "cm"),
+               legend.margin = unit(0.5, "cm"),
+               legend.title = element_text(face="italic"),
+               plot.margin=unit(c(10,5,5,5),"mm"),
+               strip.background=element_rect(colour="#f0f0f0",fill="#f0f0f0"),
+               strip.text = element_text(face="bold")
+          )) 
+      
+}
+
+scale_fill_Publication <- function(...){
+      library(scales)
+     cscale("fill","Publication",manual_pal(values = c("#386cb0","#fdb462","#7fc97f","#ef3b2c","#662506","#a6cee3","#fb9a99","#984ea3","#ffff33")), ...)
+
+}
+
+scale_colour_Publication <- function(...){
+      library(scales)
+      cscale("colour","Publication",manual_pal(values = c("#386cb0","#fdb462","#7fc97f","#ef3b2c","#662506","#a6cee3","#fb9a99","#984ea3","#ffff33")), ...)
+
+}
+
+
+meanVariable <- function(dAta , var1 , var2 , var3 , group_var  ) {
+ var1 <- sym(var1)
+  var2 <- sym(var2)
+   var3 <- sym(var3)
+    group_var <- enquo(group_var)
+    join <- enquo(join)  
+  
+tempOne <- dAta %>% filter (UQE(var1) == '0' , UQE(var2) == '0' , UQE(var3) == '0' ) %>%
+                     group_by( WaterShed , River , Season , Species , Age , dataType , !!group_var) %>%
+                    summarise(predGrMean = mean(predGrowTH)) %>%
+                    ungroup() }
+
+```
+
+
+### Load Data
+```{r , warning=FALSE , message=FALSE}
+setwd(here("Data" , "Current Data"))
+
+
+load('P_ForMike_bkt 2.RData')
+pBoth_bkt <- pBoth %>% select(len , count , flow , temp , iter , isYOY , season , river , predGr , predGrSigma , predCV) %>%
+                       mutate(Species = c("Brook Trout"),
+                              WaterShed = c("West Brook"))
+
+
+load('P_ForMike_bnt 2.RData')
+pBoth_bnt <- pBoth %>% select(len , count , flow , temp , iter , isYOY , season , river , predGr , predGrSigma , predCV) %>%
+                       mutate(Species = c("Brown Trout"),
+                              WaterShed = c("West Brook"))
+
+
+load('P_ForMike_ats 2.RData')
+pBoth_ats <- pBoth %>% select(len , count , flow , temp , iter , isYOY , season , river , predGr , predGrSigma , predCV) %>%
+                       mutate(Species = c("Atlantic Salmon"),
+                              WaterShed = c("West Brook"))
+
+
+pMaster <- bind_rows(pBoth_bkt , pBoth_bnt , pBoth_ats) %>% gather(dataType , predGrowTH , -len , -count , -flow , -temp , -iter , -isYOY , -season , -river , - Species , - WaterShed ) %>% 
+           mutate(Season = ifelse(season == '1' , 'Spring' ,
+                           ifelse(season == '2' , 'Summer' , 
+                           ifelse(season == '3' , 'Fall' , 'Winter'))),
+                  River = ifelse(river == 'west brook' , 'West Brook' , 
+                          ifelse(river == 'wb mitchell' , 'Open Small' ,
+                          ifelse(river == 'wb obear' , 'Isolated Small' , 'Open Large'))) ,
+                  Age = ifelse(isYOY == '0' , 'Young of the Year' , 'Adult') ,
+                  dataType = ifelse(dataType == 'predGr' , 'Mean Growth mm/d', 
+                             ifelse(dataType == 'predGrSigma' , 'Standard Deviation' ,
+                             ifelse(dataType == 'predCV' , 'CV' , 'Hi'))) , 
+                  filt = ifelse(Age == "Young of the Year" & Season == 'Summer' , 1 , 0)) %>%
+           filter(filt == 0) %>%
+           select(WaterShed , River , Season , Species , Age , dataType , iter , len , count , flow , temp , predGrowTH)
+
+```
+
+### Temp
+```{r}
+
+tempOne <- meanVariable(pMaster , 'count' , 'len' , 'flow' , temp)
+    
+tempOne <-  pMaster %>% filter (count == '0' , len == '0' , flow == '0' ) %>% 
+                        left_join(tempOne , by = c( 'WaterShed' = 'WaterShed' , 'temp' = 'temp' , 'River' = 'River'  , 'Season' = 'Season' , 'Age' = 'Age' , 'Species' = 'Species' , 'dataType' = 'dataType')) %>%
+                        ungroup() %>%
+                        mutate(type = "Stream Temperature")   
+```
+
+### Flow
+```{r}
+
+flowOne <- meanVariable(pMaster , 'len' , 'count' , 'temp' , flow)
+      
+flowOne <- pMaster %>% filter(len == '0' , temp == '0' , count == '0'  ) %>% 
+                       left_join(flowOne , by = c('WaterShed' = 'WaterShed' , 'River' = 'River' , 'flow' = 'flow' , 'Season' = 'Season' , 'Age' = 'Age' , 'Species' = 'Species' , 'dataType' = 'dataType')) %>%
+                       ungroup() %>% 
+                       mutate(type = "Stream Flow")  
+            
+```
+
+### Count
+```{r}
+
+countOne <- meanVariable(pMaster , 'len' , 'flow' , 'temp' , count)
+    
+countOne <- pMaster %>% filter(flow == '0' , temp == '0' , len == '0' ) %>% 
+                        left_join(countOne , by = c('WaterShed' = 'WaterShed' , 'River' = 'River' , 'count' = 'count' , 'Season' = 'Season' , 'Age' = 'Age' , 'Species' = 'Species' , 'dataType' = 'dataType' )) %>%
+                        ungroup()  %>% 
+                        mutate(type = "Estimated Abundance") 
+
+```
+
+### Length
+```{r}
+
+lengthOne <- meanVariable(pMaster , 'flow' , 'count' , 'temp' , len)
+      
+lengthOne <- pMaster %>% filter(flow == '0' , temp == '0' , count == '0' ) %>% 
+                         left_join(lengthOne , by = c('WaterShed' = 'WaterShed' , 'River' = 'River' , 'len' = 'len' , 'Season' = 'Season' , 'Age' = 'Age' , 'Species' = 'Species' , 'dataType' = 'dataType' )) %>%
+                         ungroup() %>% 
+                         mutate(type = "Fish Length") 
+```
+
+### Predictions Main Effects
+```{r}
+setwd(here("Data" , "Current Data"))
+pMainEffects <- bind_rows(lengthOne , tempOne , countOne , flowOne) %>%
+                mutate(Season = as.factor(Season))
+
+save(pMainEffects , file = "westBrook_P_MainEffects.RData")
+```
+
+### Predictions Interactions
+```{r}
+
+pInteractions <- pMaster %>% group_by(WaterShed , River , Season , Species , Season, Age , len , temp , count , flow , dataType ) %>% 
+                             summarise(meanPrGrowth = mean(predGrowTH))
+
+pInteractions <- pMaster %>% left_join(pInteractions , by = c( 'WaterShed' = 'WaterShed' , 'River' = 'River' , 'Season' = 'Season' , 'Species' = 'Species' , 'Age' = 'Age' , 'len' = 'len' , 'temp' = 'temp' , 'count' = 'count' , 'flow' = 'flow' , 'dataType' = 'dataType' )) 
+
+setwd(here("Data" , "Current Data"))
+
+save(pInteractions , file = "westBrook_P_Interactions.RData")
+
+```
+
+
+```{r}
+
+setwd(here("Data" , "Current Data"))
+#save(p2 , file = "westBrookPred2.RData")
+
+
+save(pFinal , file = "westBrookPredictions.RData")
+save(p22 , file = "westBrookPred22.RData")
+
+pFinal %>% filter( len == '0' , flow == '0' , river == 'west brook'  , species == 'bkt' ,  isYOY == '1' , season == '1'  , dataType == "predGr"  ) %>% 
+      ggplot(aes(y = predGrowTH  , x = count  )) +
+          geom_line(aes(  group = interaction(iter , river , season , temp ), colour = temp), alpha = 0.3) +
+          geom_line(aes( y = meanPrGrowth , x = count , group = temp ) , size = 1) +
+          geom_point( aes( y = meanPrGrowth , x = count , group = temp  , fill =temp), shape = 21 , colour = "black" , size = 4 , stroke = 1)  + theme_Publication()
+  
+
+```
+
+
+```{r}
+pp<- pMainEffects %>% filter(type == "Stream Temperature" ,
+                             dataType == "Mean Growth mm/d" ,
+                             River %in% c("West Brook" , "Isolated Small" ),
+                             Season %in% c('Fall' , 'Spring' )  ,
+                             Age == 'Adult' ,
+                             Species %in% c('Brook Trout' , 'Brown Trout' , 'Atlantic Salmon'))
+
+shapes <- c(3 , 4 , 9 , 5 , 6 , 7)
+
+
+d <- pp %>% ggplot( aes(y = predGrowTH , x = temp , shape = Species)  ) +
+        geom_line(aes(group = interaction(iter , Season , River , Species) , colour = River) , size = 1 , alpha = 0.5)  +
+        geom_line(aes( y = predGrMean , x = temp , linetype = Season ,  group = interaction( Species , Season  , River)) , size = 1) + 
+        geom_point( aes( y = predGrMean , x = temp , group = interaction(Season , Species , River)  , shape = Species ) ,  colour = "black"  , size = 5 ) + scale_shape_manual(values= shapes)
+
+
+#Scatter <- ggplot(mtcars, aes(mpg,disp,color=factor(carb))) + geom_point(size=3) + labs(title="Scatter Plot")
+
+d +scale_colour_Publication()+ scale_fill_Publication() + theme_Publication() + labs(y = "Growth (mm/d)" , x = "Temp")
+
+
+```

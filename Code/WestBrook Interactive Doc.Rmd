@@ -1,0 +1,235 @@
+---
+title: "West Brook Growth Model Predictions"
+author: "Michael Hayden"
+date: "2/6/2018"
+output: html_document
+runtime: shiny
+---
+
+```{r, include=FALSE}
+library(dplyr)
+library(ggplot2)
+library(ggvis)
+
+library(rlang)
+library(shiny)
+library(shinycssloaders)
+library(shinythemes)
+```
+
+
+## Main Effects
+
+
+```{r, echo=FALSE}
+
+fluidRow(
+  column(4,
+      wellPanel(
+             selectInput('variable' , 
+                          'Variable To Display' , 
+                           c('temp' , 
+                             'flow' , 
+                             'count' , 
+                             'length') , 
+                                              'temp'))))
+                              
+```
+
+```{r , echo=FALSE}
+   conditionalPanel(condition = "input.variable == 'temp'" ,  ggvisOutput("plot"))
+   conditionalPanel(condition = "input.variable == 'flow'" ,  ggvisOutput("plot2A"))
+   conditionalPanel(condition = "input.variable == 'count'" ,  ggvisOutput("plot3"))  
+                                               
+                            
+```
+
+```{r , echo=FALSE}
+conditionalPanel(condition = "input.variable == 'temp'" ,
+fluidRow(
+  wellPanel(
+splitLayout(
+
+                                   checkboxGroupInput('ageAT' , 
+                                                      'Year Class' , 
+                                                      c('Juvenile' = sym('0'),
+                                                        'Adult' = sym('1')) ,
+                                                      sym('1')) ,
+                                   checkboxGroupInput('specieSAT' , 
+                                                      'Species' , 
+                                                      c('Brook Trout' = 'bkt' , 
+                                                        'Brown Trout' = 'bnt' , 
+                                                        'Atlantic Salmon' = 'ats'), 
+                                                      'bkt') ,
+                             
+                                   checkboxGroupInput("riverAT" ,
+                                                      "Tributary" , 
+                                                      c("West Brook" = "west brook" , 
+                                                        "Open Large" = "wb jimmy" , 
+                                                        "Isolated Small" = "wb obear" , 
+                                                        "Open Small" = "wb mitchell") ,
+                                                      "west brook" ) ,
+                                   checkboxGroupInput("seasoNAT" ,
+                                                      "Season" ,
+                                                      c('Spring' = '1' ,
+                                                        'Summer' = '2' ,
+                                                        'Fall' = '3' ,
+                                                        'Winter' = '4') ,
+                                                      '1' )),
+                                 sliderInput("slider2AT", label = h4("Iterations"), min = 10, 
+                                             max = 1500, value =  1000))))
+
+conditionalPanel(condition = "input.variable == 'flow'" ,
+fluidRow(
+  wellPanel(
+splitLayout(
+
+                                   checkboxGroupInput('ageAF' , 
+                                                      'Year Class' , 
+                                                      c('Juvenile' = sym('0'),
+                                                        'Adult' = sym('1')) ,
+                                                      sym('1')) ,
+                                   checkboxGroupInput('specieSAF' , 
+                                                      'Species' , 
+                                                      c('Brook Trout' = 'bkt' , 
+                                                        'Brown Trout' = 'bnt' , 
+                                                        'Atlantic Salmon' = 'ats'), 
+                                                      'bkt') ,
+                             
+                                   checkboxGroupInput("riverAF" ,
+                                                      "Tributary" , 
+                                                      c("West Brook" = "west brook" , 
+                                                        "Open Large" = "wb jimmy" , 
+                                                        "Isolated Small" = "wb obear" , 
+                                                        "Open Small" = "wb mitchell") ,
+                                                      "west brook" ) ,
+                                   checkboxGroupInput("seasoNAF" ,
+                                                      "Season" ,
+                                                      c('Spring' = '1' ,
+                                                        'Summer' = '2' ,
+                                                        'Fall' = '3' ,
+                                                        'Winter' = '4') ,
+                                                      '1' )),
+                                 sliderInput("slider2AF", label = h4("Iterations"), min = 10, 
+                                             max = 1500, value =  1000))))
+
+conditionalPanel(condition = "input.variable == 'count'" ,
+fluidRow(
+  wellPanel(
+splitLayout(
+
+                                   checkboxGroupInput('ageAC' , 
+                                                      'Year Class' , 
+                                                      c('Juvenile' = sym('0'),
+                                                        'Adult' = sym('1')) ,
+                                                      sym('1')) ,
+                                   checkboxGroupInput('specieSAC' , 
+                                                      'Species' , 
+                                                      c('Brook Trout' = 'bkt' , 
+                                                        'Brown Trout' = 'bnt' , 
+                                                        'Atlantic Salmon' = 'ats'), 
+                                                      'bkt') ,
+                             
+                                   checkboxGroupInput("riverAC" ,
+                                                      "Tributary" , 
+                                                      c("West Brook" = "west brook" , 
+                                                        "Open Large" = "wb jimmy" , 
+                                                        "Isolated Small" = "wb obear" , 
+                                                        "Open Small" = "wb mitchell") ,
+                                                      "west brook" ) ,
+                                   checkboxGroupInput("seasoNAC" ,
+                                                      "Season" ,
+                                                      c('Spring' = '1' ,
+                                                        'Summer' = '2' ,
+                                                        'Fall' = '3' ,
+                                                        'Winter' = '4') ,
+                                                      '1' )),
+                                 sliderInput("slider2AC", label = h4("Iterations"), min = 10, 
+                                             max = 1500, value =  1000))))
+                               
+```
+
+
+```{r , echo=FALSE}
+setwd("/Users/michaeljames/Documents/MastersProject/West Brook Visulizations/Data/Current Data")
+load('westBrookPredictions.RData')
+load('westBrookPred2.RData')
+tempTwo <- read.csv("WestBrookFilteredTemp.csv" , header = TRUE)
+p2$streamName<-factor(p2$streamName, levels=c('West Brook' , 'Open Small' , 'Open Large' , 'Isolated Small'))
+  
+#ppT <- reactive( p2 %>% filter(river %in% input$riverAT , 
+                                      #  season %in% input$seasoNAT , 
+                                      #  isYOY %in% input$ageAT , 
+                                      #  species %in% input$specieSAT ,
+                                      #  iter < input$slider2AT ,
+  ppT <- reactive(tempTwo %>% filter(river == "west brook" ,
+                                season == '2' )     )                             #  type == 'temp'))
+                                        
+ppF <- reactive( p2 %>% filter(river %in% input$riverAF , 
+                                        season %in% input$seasoNAF , 
+                                        isYOY %in% input$ageAF , 
+                                        species %in% input$specieSAF ,
+                                        iter < input$slider2AF))
+
+ppC <- reactive( p2 %>% filter(river %in% input$riverAC , 
+                                        season %in% input$seasoNAC , 
+                                        isYOY %in% input$ageAC , 
+                                        species %in% input$specieSAC ,
+                                        iter < input$slider2AC))
+
+
+
+```
+
+
+```{r , echo = FALSE}
+#reactive(tempTwo %>%
+#      ggvis( y = ~predGrMean, x = ~temp ) %>%
+#      group_by( iter,  river , season , speciesName , isYOY) %>%
+#      layer_lines(stroke = ~streamName , opacity := 0.1 ) %>% bind_shiny("plot"))
+```
+
+
+
+```{r , echo = FALSE}
+reactive(  ppF() %>% filter(type == 'flow') %>%
+      ggvis( y = ~predGr, x = ~flow ) %>%
+      group_by( iter,  river , season , speciesName , isYOY) %>%
+      layer_lines(stroke = ~streamName , opacity := 0.1 ) %>%
+      group_by( river , season , speciesName , isYOY) %>%
+      layer_lines( y =~predGrMean, x =~flow , stroke = ~streamName , strokeWidth := 2) %>%
+      layer_points(y =~predGrMean , x =~flow , shape = ~speciesName , fill = ~streamName) %>%
+      add_axis("y", title = "Growth (mm/day)", title_offset = 50) %>%
+      add_axis("x", title = "Stream Flow", title_offset = 50) %>%
+      scale_numeric("x", domain = c(-1.5, 1.5), nice = FALSE) %>%
+      scale_numeric("y", domain = c(-0.5 , 2), nice = FALSE) %>%
+      add_legend("fill", title="River", properties = legend_props(legend = list(y = 0))) %>%
+      add_legend("shape", title="Species", properties = legend_props(legend = list(y = 120))) %>%
+      set_options(width = 700 , height = 650) %>%
+      hide_legend("stroke") %>%
+      set_options(duration = 0) %>% 
+      bind_shiny("plot2A"))
+```
+
+
+```{r , echo = FALSE}
+reactive( ppC() %>% filter(type == 'count') %>%
+ ggvis( y = ~predGr , x = ~count ) %>%
+      group_by( iter,  river , season , species , isYOY ) %>%
+      layer_lines(stroke = ~streamName , opacity := 0.1 ) %>%
+      group_by( river , season , species , isYOY) %>%
+      layer_lines( y =~predGrMean , x =~count , stroke = ~streamName , strokeWidth := 2) %>%
+      layer_points(y =~predGrMean , x =~count , shape = ~speciesName , fill = ~streamName) %>%
+      add_axis("y", title = "Growth (mm/day)", title_offset = 50) %>%
+      add_axis("x", title = "Estimated Abundance", title_offset = 50) %>%
+      scale_numeric("x", domain = c(-1.5, 1.5), nice = FALSE) %>%
+      scale_numeric("y", domain = c(-0.5 , 2), nice = FALSE) %>%
+      add_legend("fill", title="River", properties = legend_props(legend = list(y = 0))) %>%
+      add_legend("shape", title="Species", properties = legend_props(legend = list(y = 120))) %>%
+      hide_legend("stroke") %>%
+      set_options(width = 700 , height = 650) %>%
+      set_options(duration = 0) %>%
+      bind_shiny("plot3"))
+```
+
+
