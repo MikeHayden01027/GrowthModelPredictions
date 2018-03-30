@@ -61,7 +61,7 @@ scale_colour_Publication <- function(...){
 # Set Working Directory and Load Data
 # -----------------------------
 
-setwd("/users/ben/modelPredictions/wbGrowth/")
+#setwd("/users/ben/modelPredictions/wbGrowth/")
 load('westBrook_P_MainEffects.RData')
 load('westBrook_P_Interactions.RData') 
 
